@@ -2,42 +2,51 @@
 set -euo pipefail
 
 usage() {
-  /bin/cat <<'EOF'
+  /bin/cat <<'USAGE'
 Usage:
   modal-agent-runner -- <command> [args...]
   modal-agent-runner -c "<shell command>"
   modal-agent-runner "<shell command>"
 
-Routes agent terminal commands to Modal via scripts/modal_exec.sh.
-EOF
+Routes agent terminal commands to Modal via scripts/modal_exec.sh in the current repo.
+USAGE
 }
 
-SCRIPT_PATH="${BASH_SOURCE[0]}"
-while [[ -L "$SCRIPT_PATH" ]]; do
-  LINK_TARGET="$(/usr/bin/readlink "$SCRIPT_PATH")"
-  if [[ "$LINK_TARGET" == /* ]]; then
-    SCRIPT_PATH="$LINK_TARGET"
-  else
-    SCRIPT_PATH="$(cd "${SCRIPT_PATH%/*}" && /bin/pwd)/$LINK_TARGET"
+find_repo_root() {
+  if [[ -n "${MODAL_AGENT_REPO_ROOT:-}" ]]; then
+    if [[ -x "${MODAL_AGENT_REPO_ROOT}/scripts/modal_exec.sh" ]] && [[ -f "${MODAL_AGENT_REPO_ROOT}/modal_tasks.py" ]]; then
+      /bin/echo "${MODAL_AGENT_REPO_ROOT}"
+      return 0
+    fi
   fi
-done
-SCRIPT_DIR="${SCRIPT_PATH%/*}"
-if [[ "$SCRIPT_DIR" == "$SCRIPT_PATH" ]]; then
-  SCRIPT_DIR="."
-fi
-SCRIPT_DIR="$(cd "$SCRIPT_DIR" && /bin/pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && /bin/pwd)"
-MODAL_EXEC="${ROOT_DIR}/scripts/modal_exec.sh"
 
-if [[ ! -x "$MODAL_EXEC" ]]; then
-  echo "Error: missing executable ${MODAL_EXEC}" >&2
-  exit 2
-fi
+  local dir="$PWD"
+  while true; do
+    if [[ -x "${dir}/scripts/modal_exec.sh" ]] && [[ -f "${dir}/modal_tasks.py" ]]; then
+      /bin/echo "${dir}"
+      return 0
+    fi
+    if [[ "${dir}" == "/" ]]; then
+      break
+    fi
+    dir="$(dirname "${dir}")"
+  done
+
+  return 1
+}
 
 if [[ $# -eq 0 ]]; then
   usage
   exit 2
 fi
+
+ROOT_DIR="$(find_repo_root)" || {
+  echo "Error: could not locate a Modal task-runner repo from \$PWD (${PWD})." >&2
+  echo "Run from inside a clone containing scripts/modal_exec.sh and modal_tasks.py," >&2
+  echo "or set MODAL_AGENT_REPO_ROOT to that clone path." >&2
+  exit 2
+}
+MODAL_EXEC="${ROOT_DIR}/scripts/modal_exec.sh"
 
 cd "$ROOT_DIR"
 
