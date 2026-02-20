@@ -1,0 +1,8 @@
+Follow `ANTIGRAVITY.md` in the workspace root.
+
+For all terminal commands, use only:
+
+- `$HOME/.local/bin/modal-agent-runner -c "<command>"`
+- `$HOME/.local/bin/modal-agent-runner -- <binary> <args...>`
+
+Do not execute direct local commands when Modal routing is possible.

@@ -1,0 +1,10 @@
+Follow `ANTIGRAVITY.md` in the workspace root.
+
+Applies to Codex, Gemini Code Assist, Cline, Kilo Code, Roo Code, and Claude Code.
+
+Terminal commands must execute only via:
+
+- `$HOME/.local/bin/modal-agent-runner -c "<command>"`
+- `$HOME/.local/bin/modal-agent-runner -- <binary> <args...>`
+
+Do not run direct local terminal commands when the action can be executed through Modal.

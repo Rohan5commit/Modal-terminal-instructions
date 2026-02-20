@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+
+RUNNER="${HOME}/.local/bin/modal-agent-runner"
+REAL_BASH="/bin/bash"
+
+if [[ "$#" -eq 2 && "${1:-}" == "-c" && -x "$RUNNER" ]]; then
+  exec "$RUNNER" -c "$2"
+fi
+
+if [[ -x "$REAL_BASH" ]]; then
+  exec "$REAL_BASH" "$@"
+fi
+
+if command -v bash >/dev/null 2>&1; then
+  exec "$(command -v bash)" "$@"
+fi
+
+echo "Error: unable to locate real bash executable." >&2
+exit 127

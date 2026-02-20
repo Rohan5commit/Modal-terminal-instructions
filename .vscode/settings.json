@@ -1,0 +1,12 @@
+{
+    "git.ignoreLimitWarning": true,
+    "geminicodeassist.rules": "Follow ANTIGRAVITY.md in the workspace root. For terminal execution, only use $HOME/.local/bin/modal-agent-runner -c \"<command>\" or $HOME/.local/bin/modal-agent-runner -- <binary> <args...>. Do not run direct local terminal commands when Modal routing is possible.",
+    "terminal.integrated.env.osx": {
+        "PATH": "${workspaceFolder}/.modal-shims:${env:PATH}",
+        "MODAL_CPU": "6",
+        "MODAL_MEMORY_MB": "14336",
+        "MODAL_RUN_FLAGS": "",
+        "MODAL_SYNC_BACK": "1"
+    },
+    "geminicodeassist.agentYoloMode": false
+}
