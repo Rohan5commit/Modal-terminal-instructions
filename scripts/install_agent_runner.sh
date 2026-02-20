@@ -11,101 +11,64 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && /bin/pwd)"
 
 TARGET_DIR="${HOME}/.local/bin"
 TARGET_PATH="${TARGET_DIR}/modal-agent-runner"
+RUNNER_SOURCE_PATH="${ROOT_DIR}/scripts/agent_terminal_runner.sh"
+
+GLOBAL_DATA_DIR="${HOME}/.local/share/modal-agent-runner"
+GLOBAL_TASKS_PATH="${GLOBAL_DATA_DIR}/modal_remote_tasks.py"
+GLOBAL_TASKS_SOURCE="${ROOT_DIR}/scripts/modal_remote_tasks.py"
+
+CONFIG_DIR="${HOME}/.config/modal-agent-runner"
+CONFIG_PATH="${CONFIG_DIR}/config.env"
+
+DEFAULT_REPO_URL="$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || true)"
+DEFAULT_REPO_BRANCH="$(git -C "$ROOT_DIR" branch --show-current 2>/dev/null || true)"
+if [[ -z "$DEFAULT_REPO_BRANCH" ]]; then
+  DEFAULT_REPO_BRANCH="main"
+fi
 
 /bin/mkdir -p "$TARGET_DIR"
+/bin/mkdir -p "$GLOBAL_DATA_DIR"
+/bin/mkdir -p "$CONFIG_DIR"
+
 if [[ -e "$TARGET_PATH" || -L "$TARGET_PATH" ]]; then
   /bin/rm -f "$TARGET_PATH"
 fi
-/bin/cat > "$TARGET_PATH" <<'EOF'
-#!/bin/bash
-set -euo pipefail
+/bin/cp "$RUNNER_SOURCE_PATH" "$TARGET_PATH"
+/bin/chmod +x "$TARGET_PATH"
 
-usage() {
-  /bin/cat <<'USAGE'
-Usage:
-  modal-agent-runner -- <command> [args...]
-  modal-agent-runner -c "<shell command>"
-  modal-agent-runner "<shell command>"
-
-Routes agent terminal commands to Modal via scripts/modal_exec.sh in the current repo.
-USAGE
-}
-
-find_repo_root() {
-  if [[ -n "${MODAL_AGENT_REPO_ROOT:-}" ]]; then
-    if [[ -x "${MODAL_AGENT_REPO_ROOT}/scripts/modal_exec.sh" ]] && [[ -f "${MODAL_AGENT_REPO_ROOT}/modal_tasks.py" ]]; then
-      /bin/echo "${MODAL_AGENT_REPO_ROOT}"
-      return 0
-    fi
-  fi
-
-  local dir="$PWD"
-  while true; do
-    if [[ -x "${dir}/scripts/modal_exec.sh" ]] && [[ -f "${dir}/modal_tasks.py" ]]; then
-      /bin/echo "${dir}"
-      return 0
-    fi
-    if [[ "${dir}" == "/" ]]; then
-      break
-    fi
-    dir="$(dirname "${dir}")"
-  done
-
-  return 1
-}
-
-if [[ $# -eq 0 ]]; then
-  usage
+if [[ ! -f "$GLOBAL_TASKS_SOURCE" ]]; then
+  echo "Error: missing source file ${GLOBAL_TASKS_SOURCE}" >&2
   exit 2
 fi
+/bin/cp "$GLOBAL_TASKS_SOURCE" "$GLOBAL_TASKS_PATH"
+/bin/chmod +x "$GLOBAL_TASKS_PATH"
 
-ROOT_DIR="$(find_repo_root)" || {
-  echo "Error: could not locate a Modal task-runner repo from \$PWD (${PWD})." >&2
-  echo "Run from inside a clone containing scripts/modal_exec.sh and modal_tasks.py," >&2
-  echo "or set MODAL_AGENT_REPO_ROOT to that clone path." >&2
-  exit 2
-}
-MODAL_EXEC="${ROOT_DIR}/scripts/modal_exec.sh"
-
-cd "$ROOT_DIR"
-
-case "${1:-}" in
-  -h|--help)
-    usage
-    exit 0
-    ;;
-  -c|--cmd)
-    shift
-    if [[ $# -eq 0 ]]; then
-      echo "Error: missing command after -c/--cmd" >&2
-      exit 2
-    fi
-    exec "$MODAL_EXEC" -c "$1"
-    ;;
-  --)
-    shift
-    if [[ $# -eq 0 ]]; then
-      echo "Error: missing command after --" >&2
-      exit 2
-    fi
-    exec "$MODAL_EXEC" -- "$@"
-    ;;
-  *)
-    if [[ $# -eq 1 ]]; then
-      exec "$MODAL_EXEC" -c "$1"
-    fi
-    exec "$MODAL_EXEC" -- "$@"
-    ;;
-esac
+if [[ ! -f "$CONFIG_PATH" ]]; then
+  /bin/cat > "$CONFIG_PATH" <<EOF
+# Modal agent runner defaults (created by install_agent_runner.sh)
+MODAL_REMOTE_REPO_URL="${DEFAULT_REPO_URL}"
+MODAL_REMOTE_REPO_BRANCH="${DEFAULT_REPO_BRANCH}"
+MODAL_REMOTE_PUSH="1"
+MODAL_REMOTE_COMMIT_MESSAGE="modal remote update"
+MODAL_CPU="6"
+MODAL_MEMORY_MB="14336"
 EOF
-/bin/chmod +x "$TARGET_PATH"
+fi
 
 /bin/cat <<EOF
 Installed global agent terminal runner:
   ${TARGET_PATH}
+Installed global remote task file:
+  ${GLOBAL_TASKS_PATH}
+Config file:
+  ${CONFIG_PATH}
 
 Set this as your terminal command runner for each coding agent.
 Examples:
   ${TARGET_PATH} -c "hostname"
   ${TARGET_PATH} -- ls -la
+
+Remote-only mode (no local repo checkout):
+  - Ensure MODAL_REMOTE_REPO_URL and MODAL_REMOTE_REPO_BRANCH are set in ${CONFIG_PATH}
+  - Ensure Modal secret named github-token includes GITHUB_TOKEN
 EOF

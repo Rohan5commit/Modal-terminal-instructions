@@ -157,6 +157,22 @@ Quick verification:
 make agent-runner-check
 ```
 
+Remote-only mode (no local repo clone):
+
+```bash
+# created by make agent-runner-install
+cat ~/.config/modal-agent-runner/config.env
+
+# ensure Modal has github-token secret
+/usr/bin/python3 -m modal secret create github-token GITHUB_TOKEN="$(gh auth token)" --force
+
+# run from anywhere (for example /tmp)
+cd /tmp
+$HOME/.local/bin/modal-agent-runner -c "hostname && pwd"
+```
+
+In remote-only mode, the runner clones `MODAL_REMOTE_REPO_URL` inside Modal and executes there.
+
 ## Antigravity one-file policy
 
 Canonical policy file:
