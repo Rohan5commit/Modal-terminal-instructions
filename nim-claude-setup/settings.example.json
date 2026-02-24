@@ -4,7 +4,6 @@
     "ANTHROPIC_BASE_URL": "http://localhost:8091",
     "ANTHROPIC_API_KEY": "dummy",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "NIM_API_KEY": "<your_nvidia_nim_api_key>",
     "NIM_PRIMARY_MODEL": "qwen/qwen3-coder-480b-a35b-instruct",
     "NIM_SECONDARY_MODEL": "qwen/qwen2.5-coder-32b-instruct",
     "NIM_PRIMARY_DISPLAY_NAME": "Qwen 3 Coder 480B (Default)",

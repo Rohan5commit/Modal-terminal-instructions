@@ -1,4 +1,9 @@
 # >>> claude-nim bridge >>>
+_nim_local_env_file="$HOME/.nim-claude-local.env"
+if [[ -f "$_nim_local_env_file" ]]; then
+  # shellcheck disable=SC1090
+  source "$_nim_local_env_file"
+fi
 _nim_claude_port="${NIM_PROXY_PORT:-8091}"
 _nim_claude_base_url="http://localhost:${_nim_claude_port}"
 _nim_claude_settings_file="$HOME/.claude/settings.json"
@@ -7,9 +12,14 @@ _nim_secondary_model="${NIM_SECONDARY_MODEL:-qwen/qwen2.5-coder-32b-instruct}"
 _nim_primary_fallback_model="${NIM_PRIMARY_FALLBACK_MODEL:-qwen/qwen2.5-coder-32b-instruct}"
 _nim_primary_display_name="${NIM_PRIMARY_DISPLAY_NAME:-Qwen 3 Coder 480B (Default)}"
 _nim_secondary_display_name="${NIM_SECONDARY_DISPLAY_NAME:-Qwen 2.5 Coder 32B (Secondary)}"
-_nim_default_selector_file="$HOME/.claude/nim-default-model"
+_nim_default_selector_file="$HOME/.nim-claude-default-model"
+_nim_legacy_selector_file="$HOME/.claude/nim-default-model"
 _nim_proxy_pid_file="/tmp/nim-claude-proxy-${_nim_claude_port}.pid"
 _nim_proxy_log_file="/tmp/nim-claude-proxy-${_nim_claude_port}.log"
+
+if [[ ! -f "$_nim_default_selector_file" && -f "$_nim_legacy_selector_file" ]]; then
+  cp "$_nim_legacy_selector_file" "$_nim_default_selector_file" >/dev/null 2>&1 || true
+fi
 
 _nim_claude_read_key() {
   local settings_file="$1"
