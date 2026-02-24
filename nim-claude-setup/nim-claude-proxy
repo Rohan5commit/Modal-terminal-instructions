@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PORT="${NIM_PROXY_PORT:-8090}"
+PID_FILE="${NIM_PROXY_PID_FILE:-/tmp/nim-claude-proxy.pid}"
+LOG_FILE="${NIM_PROXY_LOG_FILE:-/tmp/nim-claude-proxy.log}"
+SERVER_SCRIPT="${NIM_PROXY_SERVER_SCRIPT:-$HOME/.local/share/nim-claude-proxy/server.py}"
+CLAUDE_SETTINGS="${CLAUDE_SETTINGS_PATH:-$HOME/.claude/settings.json}"
+
+is_running() {
+  [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" >/dev/null 2>&1
+}
+
+resolve_nim_key() {
+  if [[ -n "${NIM_API_KEY:-}" ]]; then
+    printf '%s' "$NIM_API_KEY"
+    return 0
+  fi
+
+  if [[ -f "$CLAUDE_SETTINGS" ]]; then
+    python3 - "$CLAUDE_SETTINGS" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    data = json.load(open(path, 'r', encoding='utf-8'))
+except Exception:
+    print("")
+    raise SystemExit(0)
+
+env = data.get('env') if isinstance(data, dict) else {}
+if isinstance(env, dict):
+    key = env.get('NIM_API_KEY') or env.get('NVIDIA_API_KEY') or env.get('MISTRAL_API_KEY')
+    if isinstance(key, str):
+        print(key.strip())
+        raise SystemExit(0)
+print("")
+PY
+    return 0
+  fi
+
+  printf ''
+}
+
+start_proxy() {
+  if is_running; then
+    echo "nim-claude-proxy already running (pid $(cat "$PID_FILE")) on http://localhost:$PORT"
+    return 0
+  fi
+
+  local resolved_key
+  resolved_key="$(resolve_nim_key)"
+
+  if [[ -n "$resolved_key" ]]; then
+    NIM_API_KEY="$resolved_key" nohup python3 "$SERVER_SCRIPT" >>"$LOG_FILE" 2>&1 &
+  else
+    nohup python3 "$SERVER_SCRIPT" >>"$LOG_FILE" 2>&1 &
+  fi
+
+  echo "$!" >"$PID_FILE"
+  sleep 1
+
+  if kill -0 "$(cat "$PID_FILE")" >/dev/null 2>&1; then
+    echo "nim-claude-proxy started on http://localhost:$PORT (pid $(cat "$PID_FILE"))"
+    echo "logs: $LOG_FILE"
+    if [[ -z "$resolved_key" ]]; then
+      echo "warning: NIM API key not found (set NIM_API_KEY or add NIM_API_KEY in ~/.claude/settings.json)" >&2
+    fi
+    return 0
+  fi
+
+  echo "Failed to start nim-claude-proxy. Check logs: $LOG_FILE" >&2
+  rm -f "$PID_FILE"
+  return 1
+}
+
+stop_proxy() {
+  if ! is_running; then
+    echo "nim-claude-proxy is not running"
+    rm -f "$PID_FILE"
+    return 0
+  fi
+
+  local pid
+  pid="$(cat "$PID_FILE")"
+  kill "$pid" >/dev/null 2>&1 || true
+  sleep 1
+  kill -0 "$pid" >/dev/null 2>&1 && kill -9 "$pid" >/dev/null 2>&1 || true
+  rm -f "$PID_FILE"
+  echo "nim-claude-proxy stopped"
+}
+
+status_proxy() {
+  if is_running; then
+    echo "nim-claude-proxy is running (pid $(cat "$PID_FILE")) on http://localhost:$PORT"
+    curl -fsS "http://localhost:$PORT/health" || true
+  else
+    echo "nim-claude-proxy is not running"
+    return 1
+  fi
+}
+
+show_logs() {
+  local lines="${2:-100}"
+  if [[ -f "$LOG_FILE" ]]; then
+    tail -n "$lines" "$LOG_FILE"
+  else
+    echo "No log file found: $LOG_FILE"
+  fi
+}
+
+case "${1:-}" in
+  start) start_proxy ;;
+  stop) stop_proxy ;;
+  restart) stop_proxy || true; start_proxy ;;
+  status) status_proxy ;;
+  logs) show_logs "$@" ;;
+  *)
+    echo "Usage: nim-claude-proxy {start|stop|restart|status|logs [lines]}"
+    exit 2
+    ;;
+esac
